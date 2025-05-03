@@ -10,7 +10,6 @@ import { nonMaxSuppression } from './nonMaxSuppression';
 import { doubleThreshold } from './doubleThreshold';
 import { hysteresis } from './hysteresis';
 
-
 @Injectable()
 export class CannyEdgeDetectionService {
   @MessagePattern({ cmd: 'canny_edge_detection' })
@@ -18,27 +17,53 @@ export class CannyEdgeDetectionService {
     try {
       if (!fs.existsSync(imagePath)) throw new Error('File does not exist');
 
-      const outputDir = path.join(process.cwd(), 'apps/feature-detection/output_images');
+      const outputDir = path.join(
+        process.cwd(),
+        'apps/feature-detection/output_images',
+      );
       const outputFileName = 'canny_edges.png';
       const outputFilePath = path.join(outputDir, outputFileName);
-      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      if (!fs.existsSync(outputDir))
+        fs.mkdirSync(outputDir, { recursive: true });
 
       // Convert to greyscale
-      const { buffer: gray, width, height } = await convertToGreyscale(imagePath);
+      const {
+        buffer: gray,
+        width,
+        height,
+      } = await convertToGreyscale(imagePath);
+
+      // Apply Gaussian Blur
+      const blurred = applyGaussianBlur(gray, width, height);
 
       // Calculate gradients
-      const { magnitude, direction } = computeSobelGradients(gray, width!, height!);
+      const { magnitude, direction } = computeSobelGradients(
+        blurred,
+        width,
+        height,
+      );
 
       // Non-Max Suppression
-      const thinEdges = nonMaxSuppression(magnitude, direction, width!, height!);
+      const thinEdges = nonMaxSuppression(magnitude, direction, width, height);
 
       // Double Threshold
-      const { strongEdges, weakEdges } = doubleThreshold(thinEdges, width!, height!, 5, 25);
+      const { strongEdges, weakEdges } = doubleThreshold(
+        thinEdges,
+        width,
+        height,
+        50,
+        150,
+      );
+
+      // Hysteresis
+      const finalEdges = hysteresis(strongEdges, weakEdges, width, height);
 
       // Save the final output
-      await sharp(strongEdges, {
-        raw: { width: width!, height: height!, channels: 1 },
-      }).png().toFile(outputFilePath);
+      await sharp(finalEdges, {
+        raw: { width, height, channels: 1 },
+      })
+        .png()
+        .toFile(outputFilePath);
 
       return {
         success: true,

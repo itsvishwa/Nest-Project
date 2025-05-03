@@ -14,7 +14,10 @@ export class HistogramEqualizationService {
         throw new Error('File does not exist');
       }
 
-      const outputDir = path.join(process.cwd(), 'apps/enhancement/output_images');
+      const outputDir = path.join(
+        process.cwd(),
+        'apps/enhancement/output_images',
+      );
       const outputFileName = 'histogram_equalized.png';
       const outputFilePath = path.join(outputDir, outputFileName);
 
@@ -22,25 +25,39 @@ export class HistogramEqualizationService {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      const { buffer: raw, width, height } = await convertToGreyscale(imagePath);
+      const {
+        buffer: raw,
+        width,
+        height,
+      } = await convertToGreyscale(imagePath);
 
       const histogram = new Array(256).fill(0);
       for (let i = 0; i < raw.length; i++) {
+        histogram[raw[i]]++;
       }
 
       const cdf = new Array(256).fill(0);
-      cdf[0] = 0;
+      cdf[0] = histogram[0];
       for (let i = 1; i < 256; i++) {
+        cdf[i] = cdf[i - 1] + histogram[i];
       }
 
       const totalPixels = raw.length;
       const L = 256;
 
+      // Normalize CDF to map to intensity range [0, L-1]
+      const cdfMin = cdf.find((value) => value > 0) || 0;
+      for (let i = 0; i < 256; i++) {
+        cdf[i] = Math.round(
+          ((cdf[i] - cdfMin) / (totalPixels - cdfMin)) * (L - 1),
+        );
+      }
+
       const equalized = Buffer.alloc(raw.length);
 
       for (let i = 0; i < raw.length; i++) {
         const originalIntensity = raw[i];
-        const newIntensity = 0;
+        const newIntensity = cdf[originalIntensity];
         equalized[i] = newIntensity;
       }
 
