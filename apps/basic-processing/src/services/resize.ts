@@ -34,10 +34,10 @@ export class ResizeService {
 
       const resizedBuffer = this.bilinearInterpolation(
         inputBuffer,
-        inputInfo.width,
         inputInfo.height,
-        width,
+        inputInfo.width,
         height,
+        width,
       );
 
       // Save the resized image
@@ -73,34 +73,34 @@ export class ResizeService {
   ): Buffer {
     const outputBuffer = Buffer.alloc(outputWidth * outputHeight * 3); // Assuming 3 channels (RGB)
 
-    const xRatio = inputWidth / outputWidth;
-    const yRatio = inputHeight / outputHeight;
-
     for (let y = 0; y < outputHeight; y++) {
       for (let x = 0; x < outputWidth; x++) {
-        const srcX = x * xRatio;
-        const srcY = y * yRatio;
+        // Map output pixel (x, y) to input pixel space
+        const srcX = (x / outputWidth) * inputWidth;
+        const srcY = (y / outputHeight) * inputHeight;
 
-        const x1 = Math.floor(srcX);
-        const y1 = Math.floor(srcY);
-        const x2 = Math.min(x1 + 1, inputWidth - 1);
-        const y2 = Math.min(y1 + 1, inputHeight - 1);
+        // Get the integer and fractional parts of the source coordinates
+        const x0 = Math.floor(srcX);
+        const x1 = Math.min(x0 + 1, inputWidth - 1);
+        const y0 = Math.floor(srcY);
+        const y1 = Math.min(y0 + 1, inputHeight - 1);
 
-        const xWeight = srcX - x1;
-        const yWeight = srcY - y1;
+        const xWeight = srcX - x0;
+        const yWeight = srcY - y0;
 
         for (let c = 0; c < 3; c++) {
-          // Iterate over RGB channels
-          const topLeft = inputBuffer[(y1 * inputWidth + x1) * 3 + c];
-          const topRight = inputBuffer[(y1 * inputWidth + x2) * 3 + c];
-          const bottomLeft = inputBuffer[(y2 * inputWidth + x1) * 3 + c];
-          const bottomRight = inputBuffer[(y2 * inputWidth + x2) * 3 + c];
+          // Loop through RGB channels
+          const topLeft = inputBuffer[(y0 * inputWidth + x0) * 3 + c];
+          const topRight = inputBuffer[(y0 * inputWidth + x1) * 3 + c];
+          const bottomLeft = inputBuffer[(y1 * inputWidth + x0) * 3 + c];
+          const bottomRight = inputBuffer[(y1 * inputWidth + x1) * 3 + c];
 
+          // Perform bilinear interpolation
           const top = topLeft * (1 - xWeight) + topRight * xWeight;
           const bottom = bottomLeft * (1 - xWeight) + bottomRight * xWeight;
-
           const value = top * (1 - yWeight) + bottom * yWeight;
 
+          // Assign the interpolated value to the output buffer
           outputBuffer[(y * outputWidth + x) * 3 + c] = Math.round(value);
         }
       }
